@@ -199,12 +199,14 @@ PlayerName	       db      15, ?,  15 dup('$')
 AskPlayerName	       db      'Enter your name: ','$'
 Disp_Hits	       db      'Score: ??','$'
 Disp_lifes             db      'lifes: ?','$'
-GameTitle	       db      ' >>  Shooting rockets Game  << ','$'
+GameTitle	       db      ' >>  Shooting rockets Game  >> ','$'
 FinalScoreString       db      'Your final score is: ??','$'
 RocketDirection	       db      0						;0=Left, 1=Right
 EasyMode	       db      'Easy Mode','$'
 HardMode	       db      'Hard Mode','$'
 ExtremeMode	       db      'Extreme Mode','$'
+Instruction	       db      'Press ESC to exit - Space to fire - Right/Left arrows to move','$'
+separate			db		'>>','$'
 ;==================================================
 
 .CODE   
@@ -267,7 +269,7 @@ UpdateStrings Proc
      add ah, 30h
    	 mov Disp_lifes[7], ah
 	
-	PrintText 1 , 60 , Disp_Hits
+	PrintText 1 , 56 , Disp_Hits
 	PrintText 1 , 70 , Disp_lifes	
 
 	pop ax
@@ -322,15 +324,13 @@ KeyisPressed  Proc
 	
     NotRightKey:
     cmp ah,1H                 	 ;Esc to exit the game
-    ;try: cmp ax, 011bh
-	
+
 	Jnz NotESCKey
 	call Gameover 
 		
 	NotESCKey:
     cmp ah,39h                            ;go spaceKey if up button is pressed
-    ;try:cmp ax,3920
-    
+
     jnz EndofKeyisPressed
     cmp ShotStatus, 1
     jz EndofKeyisPressed
@@ -600,20 +600,28 @@ DrawInterface	Proc
 	
 	mov al, 0
 	mov cx, 80
-	DrawLineloop:
+	DrawLineloop1:
 		Print 1, al, 30h
 		inc al
-	loop DrawLineloop
-
+	loop DrawLineloop1
+	
+	mov al,0
+	mov cx, 65
+	DrawLineloop2:
+		Print 0, al, 70h
+		inc al
+	loop DrawLineloop2
+	
 	mov al,' '
 	mov PlayerName[0],al
 	mov PlayerName[1],al
 	PrintText 1 , 0 , PlayerName
-	PrintText 1 , 60 , Disp_Hits
+	PrintText 1 , 56 , Disp_Hits
 	PrintText 1 , 70 , Disp_lifes	
 	PrintText 1 , 24 , GameTitle
 	PrintText 0, 70, EasyMode
-	
+	PrintText 0, 2, Instruction
+	PrintText 1, 67,separate
 	pop dx
 	pop cx
 	pop ax
