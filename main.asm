@@ -4,6 +4,21 @@
 ;;=============================================================================;;
 ;;                  Created by: Michael Malak                        	       ;;
 ;;=============================================================================;;
+; ما هي اللعبة؟
+; صواريخ تتحرك من اسفل لأعلى الشاشة بشكل (يبدو) عشوائي
+; على اللاعب تحريك رمز لاسفل و اعلى و من خلال الضغط على مسافة يستطيع اطلق طلاقات
+; فى حالة لمس الطلقة أي من الصواريخ يحتسب نقطة واحدة للاعب
+;فى حالة تخطى الطلقة للصاروخ يفقد اللاعب نقطة من نقاط الحياة
+; نقاط الحياة هم 6
+; ف حالة تخطي اكثر من 6 صورايخ تعتبر اللعبة انتهت 
+; النتيجة النهائية هي عدد الصواريخ التى ضربت خلال اللعبة الواحدة
+
+
+;================
+;algorithm used:
+;1;;12;
+;Lifes increase with hits
+;================
 
 Print MACRO row, column, color 
    push ax
@@ -144,6 +159,14 @@ Delay  Macro Seconds, MilliSeconds
     pop ax
 ENDM Delay 
 
+ConvertDecimal MACRO  decimal, printableDecimal
+	mov al,decimal
+	xor ah, ah 
+	mov cl, 10 
+	div cl 
+	add ax, 3030h
+	mov printableDecimal,ax
+ENDM ConvertDecimal  
 ;=========================================
 .MODEL SMALL
 .STACK 64    
@@ -186,13 +209,13 @@ ShotStatus             db      0    						;1 means there exist a displayed shot,
 
 lifes                  db      6
 Misses                 db      0
-Hits                   db      0
+Hits                   db      0							;Score
 PlayerName	       db      15, ?,  15 dup('$')
 AskPlayerName	       db      'Enter your name: ','$'
-Disp_Hits	       db      'Score: 00','$'
+Disp_Hits	       db      'Score: ??','$'
 Disp_lifes             db      'lifes: ?','$'
 GameTitle	       db      ' >>  Shooting rockets Game  << ','$'
-FinalScoreString       db      ' your final score is ?','$'
+FinalScoreString       db      'Your final score is: ??','$'
 RocketDirection	       db      0						;0=Left, 1=Right
 EasyMode	       db      'Easy Mode','$'
 HardMode	       db      'Hard Mode','$'
@@ -249,13 +272,14 @@ MAIN        ENDP
 UpdateStrings Proc  
 	 push ax
 	 
-	 mov al, Hits
-	 add al, 30h
-	 mov Disp_Hits[8], al
+     ConvertDecimal Hits, ax
+	 mov Disp_Hits[8], ah
+	 mov FinalScoreString[22], ah
+	 mov Disp_Hits[7], al
 	 mov FinalScoreString[21], al
 		
-    	mov ah,lifes
-    	add ah, 30h
+     mov ah,lifes
+     add ah, 30h
    	 mov Disp_lifes[7], ah
 	
 	PrintText 1 , 60 , Disp_Hits
@@ -312,14 +336,16 @@ KeyisPressed  Proc
     jmp EndofKeyisPressed
 	
     NotRightKey:
-    cmp ah,1H                            ;Esc to exit the game
-
-     Jnz NotESCKey
-     call Gameover 
-		
-    NotESCKey:
-    cmp ah,39h                            ;go spaceKey if up button is pressed
+    cmp ah,1H                 	 ;Esc to exit the game
+    ;try: cmp ax, 011bh
 	
+	Jnz NotESCKey
+	call Gameover 
+		
+	NotESCKey:
+    cmp ah,39h                            ;go spaceKey if up button is pressed
+    ;try:cmp ax,3920
+    
     jnz EndofKeyisPressed
     cmp ShotStatus, 1
     jz EndofKeyisPressed
@@ -621,8 +647,9 @@ DrawInterface	ENDP
     mov ah,4CH
     int 21H 
     ret
- Gameover ENDP   
-
+ Gameover ENDP 
+ 
+               
 ;==================================================
 Difficulty Proc
 	
