@@ -2,8 +2,7 @@
 ;;                    Shooting rockets Game                                    ;;
 ;;                 Tested on DOSBox and emu8086                                ;;
 ;;=============================================================================;;
-;;     Created by: Michael Khalil                               			   ;;
-;;     Credit Hour system - ID:1142257                            			   ;;
+;;     Created by: Michael Malak                       			       ;;
 ;;=============================================================================;;
 
 ; ما هي اللعبة؟
@@ -38,7 +37,7 @@ Print MACRO row, column, color
    pop ax
 ENDM Print     
 
-PrintShooter MACRO row
+PrintShooter MACRO column
    push ax
    push bx
    push cx
@@ -46,11 +45,11 @@ PrintShooter MACRO row
    
    mov Ah, 02h
    mov Bh, 0h
-   mov Dh, row
-   mov Dl, 0
+   mov Dh, 24
+   mov Dl, column
    INT 10h 
    mov Ah, 09
-   mov Al, '}'
+   mov Al, 127  ;Arrow shape
    mov Bl, 02h
    mov Cx, 1h
    INT 10h   
@@ -139,20 +138,20 @@ Delay  Macro
     push ax
     push bx
     push cx
-    push dx
-    push ds
-  
-    mov cx, 2h		;Cx,Dx : number of microseconds to wait
-    mov dx, 0h
+    push dx 
+	push ds
+
+    mov cx, 1h		;Cx,Dx : number of microseconds to wait
+    mov dx, 00h
     mov ah, 86h
     int 15h
 	
-    pop ds
-    pop dx
+	pop ds
+	pop dx
     pop cx
     pop bx
     pop ax
-    
+	
 ENDM Delay 
 
 .MODEL SMALL
@@ -178,25 +177,28 @@ GameoverScreen			 db '          ________________________________________________
 	db '             ||               >> GAMEOVER <<                     ||',0ah,0dh
 	db '             ||__________________________________________________||',0ah,0dh	
 	db '$',0ah,0dh
-RocketYabove         db       24 										 
-RocketYBelow         db       25 
-RocketCol              db       0    
-RocketColor          db      0d0h    
-RandomCheck          db      1  
-RocketUpperLimit     equ     4  
-ShooterY             db      14   
-ShotX                db      ?
-ShotY                db      ?
-ShotStatus           db      0    
-lifes                equ     6
-Misses               db      0
-Hits                 db      0
-PlayerName			 db 15, ?,  15 dup('$')
-AskPlayerName		 db 'Enter your name: ','$'
-Disp_Hits			 db 'Score: 00','$'
-Disp_lifes			 db 'lifes: ?','$'
-GameTitle			 db ' >>  Shooting rockets Game  << ','$'
-FinalScoreString	 db ' your final score is ?','$'
+RocketColLeft          db       ? 										 
+RocketColRight         db       ? 
+RocketRow              db       15    
+RocketColor            db      0d0h    
+
+
+ShooterCol             db      40
+   
+ShotRow                db      ?
+ShotCol                db      ?
+ShotStatus             db      0    		;1 means there exist a displayed shot, 0 otherwise
+
+lifes                  equ     6
+Misses                 db      0
+Hits                   db      0
+PlayerName			   db 15, ?,  15 dup('$')
+AskPlayerName		   db 'Enter your name: ','$'
+Disp_Hits			   db 'Score: 00','$'
+Disp_lifes			   db 'lifes: ?','$'
+GameTitle			   db ' >>  Shooting rockets Game  << ','$'
+FinalScoreString	   db ' your final score is ?','$'
+RocketDirection		   db 0						;0=Left, 1=Right
 ;==================================================
 .CODE   
 MAIN    PROC FAR  
@@ -206,22 +208,24 @@ MAIN    PROC FAR
   Call StartMenu
   ClearScreen
   call DrawInterface
-  call RandomiseRocketRow 
-  Print  RocketYabove, RocketCol, RocketColor 
-  Print  RocketYBelow, RocketCol, RocketColor 
-  PrintShooter ShooterY
+  call ResetRocket
+  PrintShooter 40
+  call UpdateStrings
+  
   MainLoop:
-   call UpdateStrings
-   call RocketUp
+   cmp RocketDirection, 1
+   jz moveRocketRight
+   call RocketMoveLeft
+   jmp AfterRocketMove
+   moveRocketRight:
+   call RocketMoveRight
    
-	
-	
+   AfterRocketMove:
+   call CheckShotStatus			;I'll see if the shotStatus alter to 0
    cmp ShotStatus, 1
    jnz NoShotExist
    call MoveShot
-   ;call MoveShot
-   
-   
+   PrintShooter ShooterCol		;since the shot deletes the shooter at the beginning
    NoShotExist:       
     mov ah,1h
     int 16h             ;ZF=1 when a key is pressed                        
@@ -251,120 +255,146 @@ UpdateStrings Proc
    add ah, 30h
    mov Disp_lifes[7], ah
 	
-	PrintText 2 , 40 , Disp_Hits
-	PrintText 2 , 60 , Disp_lifes	
+	PrintText 1 , 60 , Disp_Hits
+	PrintText 1 , 70 , Disp_lifes	
+
 	pop ax
 	ret             
     
 UpdateStrings ENDP 
-RocketUp Proc   
-    dec RocketYabove
-    Print  RocketYabove, RocketCol, RocketColor 
-    Delete RocketYBelow, RocketCol     
-    dec RocketYBelow  
-    cmp RocketYabove,RocketUpperLimit   
-    Jnz endRocketUp 
-    Delete RocketUpperLimit, RocketCol 
-    Delete RocketUpperLimit+1, RocketCol
-	call resetRocket
-	;call resetShot
-    endRocketUp: ret              
-    
-RocketUp ENDP 
+
+RocketMoveLeft Proc   
+    dec RocketColLeft
+    Print   RocketRow ,RocketColLeft, RocketColor 
+    Delete RocketRow, RocketColRight     
+    dec RocketColRight  
+	
+    cmp RocketColLeft ,0   
+    Jnz endOfRocketMoveLeft 
+    Delete RocketRow, RocketColRight
+	Delete RocketRow, RocketColLeft	
+	call ResetRocket
+    endOfRocketMoveLeft: ret              
+RocketMoveLeft ENDP 
+
+RocketMoveRight Proc   
+    inc RocketColRight
+    Print   RocketRow ,RocketColRight, RocketColor 
+    Delete RocketRow, RocketColLeft     
+    inc RocketColleft 
+	
+    cmp RocketColRight ,80   
+    Jnz endOfRocketMoveRight 
+    Delete RocketRow, RocketColRight
+	Delete RocketRow, RocketColLeft	
+	call ResetRocket
+    endOfRocketMoveRight: ret              
+RocketMoveRight ENDP 
+
 KeyisPressed  Proc 
     mov ah,0
     int 16h
 
-    cmp ah,48h                            ;go upKey if up button is pressed
-    jnz NotUPKey
-    call MoveShooterUp 
-    jmp EndofKeyisPressed
-    NotUPKey:
-    cmp ah, 50h
-    jnz NotDOWNKey
-    call MoveShooterDown
-    jmp EndofKeyisPressed
-    NotDOWNKey:
-	cmp ah,1H                 		 ;Esc to exit the game
-    Jnz NotESCKey
-	call Gameover 
+    cmp ah,4bh                            ;Move Shooter Left if left button is pressed
+    jnz NotLeftKey
+		call MoveShooterLeft 
+	jmp EndofKeyisPressed
+	
+    NotLeftKey:
+    cmp ah,4dh					
+    jnz NotRightKey						  ;Move Shooter Right if Right button is pressed
+		call MoveShooterRight
+	jmp EndofKeyisPressed
+	
+    NotRightKey:
+	cmp ah,1H                 		      ;Esc to exit the game
+    ;try: cmp ax, 011bh
+	
+	Jnz NotESCKey
+		call Gameover 
+		
 	NotESCKey:
     cmp ah,39h                            ;go spaceKey if up button is pressed
-    jnz EndofKeyisPressed
-        cmp ShotStatus, 1
-        jz EndofKeyisPressed
+    ;try:cmp ax,3920
+	
+	jnz EndofKeyisPressed
+    cmp ShotStatus, 1
+    jz EndofKeyisPressed
             mov al,1                      ;intialize a new shot
             mov ShotStatus,1 
-            mov al, ShooterY
-            mov ShotY, al
-            mov al, 2
-            mov ShotX,al 
+            mov al, ShooterCol
+            mov ShotCol, al
+            mov al, 24					 ;it will be decremented in the new MainLoop
+            mov ShotRow,al 
 			
     EndofKeyisPressed:
     ret
 KeyisPressed  ENDP 
 
-MoveShooterUp  Proc  
-     cmp ShooterY, RocketUpperLimit
-     JZ NoMoveUp
-     dec ShooterY
-     PrintShooter ShooterY 
-     mov al, ShooterY   
+MoveShooterLeft  Proc  
+     cmp ShooterCol, 0
+     JZ NoMoveLeft
+     dec ShooterCol
+     PrintShooter ShooterCol 
+     mov al, ShooterCol   
      inc al
-     delete al, 0
-    NoMoveUp:
+     delete 24, al
+    NoMoveLeft:
     ret
-MoveShooterUp  ENDP 
+MoveShooterLeft  ENDP 
 
-MoveShooterDown  Proc 
-     cmp ShooterY, 24
-     JZ NoMoveDown
-     inc ShooterY
-     PrintShooter ShooterY  
-     mov al, ShooterY   
+MoveShooterRight  Proc 
+     cmp ShooterCol, 79
+     JZ NoMoveRight
+     inc ShooterCol
+     PrintShooter ShooterCol  
+     mov al, ShooterCol   
      dec al
-     delete al, 0   
-     NoMoveDown:
+     delete 24, al 
+     NoMoveRight:
     ret
-MoveShooterDown  ENDP 
+MoveShooterRight  ENDP 
 
 MoveShot  Proc 
-    inc ShotX
-    PrintShot ShotY,ShotX 
-    mov al, ShotX   
-    dec al
-    delete ShotY, al
-        call CheckShotStatus  
+    dec ShotRow
+    PrintShot ShotRow,ShotCol 
+    mov al, ShotRow  
+    inc al
+    delete al, ShotCol    
     ret
 MoveShot  ENDP 
 
 CheckShotStatus  Proc
     push ax
-    mov ah,RocketCol
-    dec ah              ;thinking that the rocket is a step ahead since I'm comparing before drawing
-    cmp ah, ShotX 
-    JC ShotXExceededRocket 
-    JZ CheckShotHIT  
-    jmp noChange
-		
-		CheckShotHIT: 
-        mov ah,ShotY
-        cmp ah, RocketYabove
+	
+	cmp ShotStatus, 1
+	jnz noChange
+	
+    mov ah,RocketRow
+    inc ah              ;Checking the row I {WILL} draw the shot in if occupied by a rocket
+    cmp ah, ShotRow  
+    JNZ CheckEndRange 
+						;Check if it was a hit
+        mov al,ShotCol
+        cmp al, RocketColLeft
         JZ Hit      
-        cmp ah, RocketYBelow
-        JZ Hit   
-     
-	 ShotXExceededRocket: 
+        cmp al, RocketColRight
+        JZ Hit 
+		
+    CheckEndRange:
+	 cmp ShotRow, 2			;It stops while printed on the number of row I put here
+	 jnz noChange			
 	 inc Misses
-	 call resetShot
-     jmp noChange
+	 jmp ResetTheShot
 	 
-     Hit: 
-     inc Hits
-     call resetShot
-	 Delete RocketYabove, RocketCol 
-	 Delete RocketYBelow, RocketCol 
-     call resetRocket
+     Hit: inc Hits
+	 Delete RocketRow, RocketColLeft
+	 Delete RocketRow, RocketColRight
+	 call ResetRocket
+	 
+	 ResetTheShot:
+     call ResetShot
+     call UpdateStrings
  
      noChange:
 	 
@@ -379,23 +409,19 @@ RandomiseRocketRow Proc
    push cx
    push dx 
    
-RestartRandomise:
+   ; Range of row= [5,24]
    mov ah, 2ch                
    int 21h                      ; get system time where DH = second   Dl=MilliSeconds
    xor ax, ax
    mov al, dl
-   mov bl, 79
+   mov bl, 20					; That limits the remainder to be [0,19]
    div bl
-   mov RocketCol, ah    ;the remainder
-   ;;;
-   endRandomise: 
-   cmp RocketCol, 0
-   JZ RestartRandomise
-   cmp RocketCol, 1
-   JZ RestartRandomise
+   add ah, 3					;The range would be= [3,22]
+   mov RocketRow, ah   	 		
    
+   ;Change the color of rocket
    NotBlack:
-   add RocketColor ,10h
+   add RocketColor ,10h			;Add one to background color
    cmp RocketColor ,00h
    jz NotBlack
         
@@ -406,22 +432,51 @@ RestartRandomise:
    ret  
 RandomiseRocketRow ENDP 
 
-resetRocket Proc
-    mov RocketYabove, 24 
-    mov RocketYBelow, 25 
-    call RandomiseRocketCol 
+ResetRocket Proc
+    call RandomiseRocketDirection
+	call RandomiseRocketRow
+	
+	cmp RocketDirection, 1
+	jnz movementLeft
+	mov RocketColLeft, 0	 
+    mov RocketColRight, 1
+	jmp EndOfResetRocket
+	
+	movementLeft:
+	mov RocketColLeft, 79	 
+    mov RocketColRight, 80 
+    EndOfResetRocket: 
     ret 
-resetRocket ENDP 
+ResetRocket ENDP 
 
-resetShot Proc
-	 cmp ShotStatus, 00
-	 JZ NoShotToDelete
-	 delete ShotY, ShotX 
+RandomiseRocketDirection Proc
+   push ax
+   push bx
+   push cx
+   push dx 
+
+   mov ah, 2ch                
+   int 21h                      ; get system time where DH = second   Dl=MilliSeconds
+   xor ax, ax
+   mov al, dl
+   mov bl, 2					;That limits the remainder to be [0,1]
+   div bl						
+   mov RocketDirection,ah
+
+   pop dx
+   pop cx
+   pop bx
+   pop ax
+   ret  
+	ret
+RandomiseRocketDirection ENDP
+
+ResetShot Proc
+	 delete ShotRow, ShotCol  
      mov al,0          
      mov ShotStatus,al 
-	 NoShotToDelete:
 	ret
-resetShot ENDP 
+ResetShot ENDP 
 
 StartMenu Proc
     
@@ -510,22 +565,20 @@ DrawInterface	Proc
 	
 	;Go to the line beginning
 	
-	mov al,0
-	mov ah, RocketUpperLimit
-	dec ah
+	mov al, 0
 	mov cx, 80
 	DrawLineloop:
-		Print ah, al, 30h
+		Print 1, al, 30h
 		inc al
 	loop DrawLineloop
 
 	mov al,' '
 	mov PlayerName[0],al
 	mov PlayerName[1],al
-	PrintText 2 , 0 , PlayerName
-	PrintText 2 , 40 , Disp_Hits
-	PrintText 2 , 60 , Disp_lifes	
-	PrintText 0 , 24 , GameTitle
+	PrintText 1 , 0 , PlayerName
+	PrintText 1 , 60 , Disp_Hits
+	PrintText 1 , 70 , Disp_lifes	
+	PrintText 1 , 24 , GameTitle
 
 	pop dx
 	pop cx
