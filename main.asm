@@ -2,17 +2,9 @@
 ;;                    Shooting rockets Game                                    ;;
 ;;                 Tested on DOSBox and emu8086                                ;;
 ;;=============================================================================;;
-;;     Created by: Michael Malak                       			       ;;
+;;                  Created by: Michael Malak                        	       ;;
 ;;=============================================================================;;
 
-; ما هي اللعبة؟
-; صواريخ تتحرك من اسفل لأعلى الشاشة بشكل (يبدو) عشوائي
-; على اللاعب تحريك رمز لاسفل و اعلى و من خلال الضغط على مسافة يستطيع اطلق طلاقات
-; فى حالة لمس الطلقة أي من الصواريخ يحتسب نقطة واحدة للاعب
-;فى حالة تخطى الطلقة للصاروخ يفقد اللاعب نقطة من نقاط الحياة
-; نقاط الحياة هم 6
-; ف حالة تخطي اكثر من 6 صورايخ تعتبر اللعبة انتهت 
-; النتيجة النهائية هي عدد الصواريخ التى ضربت خلال اللعبة الواحدة
 
 Print MACRO row, column, color 
    push ax
@@ -133,7 +125,7 @@ Delete Macro row, column
    int 10h 
 ENDM Delete
 
-Delay  Macro
+Delay  Macro Seconds, MilliSeconds
     
     push ax
     push bx
@@ -141,8 +133,8 @@ Delay  Macro
     push dx 
 	push ds
 
-    mov cx, 1h		;Cx,Dx : number of microseconds to wait
-    mov dx, 00h
+    mov cx, Seconds		;Cx,Dx : number of microseconds to wait
+    mov dx, MilliSeconds
     mov ah, 86h
     int 15h
 	
@@ -162,11 +154,12 @@ StartScreen			 db '              ===============================================
 	db '             ||         >>  Shooting rockets Game  <<            ||',0ah,0dh
 	db '             ||__________________________________________________||',0ah,0dh
 	db '             ||                                                  ||',0ah,0dh          
-	db '             ||     Use up and down key to move gunshooter       ||',0ah,0dh
+	db '             ||     Use left and right key to move gunshooter    ||',0ah,0dh
 	db '             ||          and space button to shoot bullet        ||',0ah,0dh
 	db '             ||                                                  ||',0ah,0dh
-	db '             ||                  You have 6 lifes                ||',0ah,0dh
+	db '             ||              You begin with 6 lifes              ||',0ah,0dh
 	db '             ||  Score the highest you can score before you die  ||',0ah,0dh
+	db '             ||        Scoring points increase your lifes        ||',0ah,0dh
 	db '             ||                                                  ||',0ah,0dh
 	db '             ||            Press Enter to start playing          ||',0ah,0dh 
 	db '             ||            Press ESC to Exit                     ||',0ah,0dh
@@ -179,6 +172,9 @@ GameoverScreen			 db '          ________________________________________________
 	db '$',0ah,0dh
 RocketColLeft          db       ? 										 
 RocketColRight         db       ? 
+RocketColCenter	       db		?
+
+
 RocketRow              db       15    
 RocketColor            db      0d0h    
 
@@ -189,7 +185,7 @@ ShotRow                db      ?
 ShotCol                db      ?
 ShotStatus             db      0    		;1 means there exist a displayed shot, 0 otherwise
 
-lifes                  equ     6
+lifes                  db      6
 Misses                 db      0
 Hits                   db      0
 PlayerName			   db 15, ?,  15 dup('$')
@@ -199,6 +195,9 @@ Disp_lifes			   db 'lifes: ?','$'
 GameTitle			   db ' >>  Shooting rockets Game  << ','$'
 FinalScoreString	   db ' your final score is ?','$'
 RocketDirection		   db 0						;0=Left, 1=Right
+EasyMode			   db 'Easy Mode','$'
+HardMode			   db 'Hard Mode','$'
+ExtremeMode			   db 'Extreme Mode','$'
 ;==================================================
 .CODE   
 MAIN    PROC FAR  
@@ -221,6 +220,8 @@ MAIN    PROC FAR
    call RocketMoveRight
    
    AfterRocketMove:
+   cmp ShotStatus, 1
+   jnz NoShotExist
    call CheckShotStatus			;I'll see if the shotStatus alter to 0
    cmp ShotStatus, 1
    jnz NoShotExist
@@ -232,7 +233,8 @@ MAIN    PROC FAR
     jz NokeyPress
       call KeyisPressed
     NokeyPress:
-	Delay
+	call Difficulty
+	EndOfMainLoop:
   jmp MainLoop
 
 hlt
@@ -247,13 +249,9 @@ UpdateStrings Proc
 	 mov Disp_Hits[8], al
 	 mov FinalScoreString[21], al
 		
-   mov ah,lifes
-   sub ah, Misses
-   jnz continueTheGame
-   call Gameover
-   continueTheGame:
-   add ah, 30h
-   mov Disp_lifes[7], ah
+    mov ah,lifes
+    add ah, 30h
+    mov Disp_lifes[7], ah
 	
 	PrintText 1 , 60 , Disp_Hits
 	PrintText 1 , 70 , Disp_lifes	
@@ -268,11 +266,11 @@ RocketMoveLeft Proc
     Print   RocketRow ,RocketColLeft, RocketColor 
     Delete RocketRow, RocketColRight     
     dec RocketColRight  
+	dec RocketColCenter
 	
     cmp RocketColLeft ,0   
     Jnz endOfRocketMoveLeft 
-    Delete RocketRow, RocketColRight
-	Delete RocketRow, RocketColLeft	
+    call DeleteRocket
 	call ResetRocket
     endOfRocketMoveLeft: ret              
 RocketMoveLeft ENDP 
@@ -282,11 +280,11 @@ RocketMoveRight Proc
     Print   RocketRow ,RocketColRight, RocketColor 
     Delete RocketRow, RocketColLeft     
     inc RocketColleft 
+	inc RocketColCenter
 	
     cmp RocketColRight ,80   
     Jnz endOfRocketMoveRight 
-    Delete RocketRow, RocketColRight
-	Delete RocketRow, RocketColLeft	
+    call DeleteRocket
 	call ResetRocket
     endOfRocketMoveRight: ret              
 RocketMoveRight ENDP 
@@ -367,9 +365,6 @@ MoveShot  ENDP
 CheckShotStatus  Proc
     push ax
 	
-	cmp ShotStatus, 1
-	jnz noChange
-	
     mov ah,RocketRow
     inc ah              ;Checking the row I {WILL} draw the shot in if occupied by a rocket
     cmp ah, ShotRow  
@@ -378,30 +373,50 @@ CheckShotStatus  Proc
         mov al,ShotCol
         cmp al, RocketColLeft
         JZ Hit      
+		cmp al, RocketColCenter
+		JZ Hit
         cmp al, RocketColRight
-        JZ Hit 
+        JZ Hit 	
+		cmp RocketDirection, 0
+		jnz RightDirection
+		mov ah, RocketColLeft
+		dec ah
+		cmp al, ah
+        JZ Hit
+		jmp CheckEndRange
+		RightDirection:
+		mov ah, RocketColRight
+		inc ah
+		cmp al, ah
+        JZ Hit
 		
     CheckEndRange:
 	 cmp ShotRow, 2			;It stops while printed on the number of row I put here
 	 jnz noChange			
-	 inc Misses
-	 jmp ResetTheShot
+	 dec Lifes
+	 cmp lifes, 0
+     jnz ResetTheShot
+     call Gameover
 	 
      Hit: inc Hits
-	 Delete RocketRow, RocketColLeft
-	 Delete RocketRow, RocketColRight
+	 inc lifes
+	 call DeleteRocket
 	 call ResetRocket
-	 
 	 ResetTheShot:
      call ResetShot
      call UpdateStrings
- 
      noChange:
 	 
     pop ax
     ret    
 CheckShotStatus ENDP 
 
+DeleteRocket Proc
+	 Delete RocketRow, RocketColLeft
+	 Delete RocketRow, RocketColCenter
+	 Delete RocketRow, RocketColRight
+	ret
+DeleteRocket ENDP
 
 RandomiseRocketRow Proc    
    push ax
@@ -439,12 +454,15 @@ ResetRocket Proc
 	cmp RocketDirection, 1
 	jnz movementLeft
 	mov RocketColLeft, 0	 
-    mov RocketColRight, 1
+    mov RocketColCenter, 1
+	mov RocketColRight, 2
 	jmp EndOfResetRocket
 	
 	movementLeft:
-	mov RocketColLeft, 79	 
-    mov RocketColRight, 80 
+	mov RocketColLeft, 78	
+	mov RocketColCenter, 79
+	mov RocketColRight, 80
+    
     EndOfResetRocket: 
     ret 
 ResetRocket ENDP 
@@ -489,14 +507,6 @@ StartMenu Proc
 	ClearScreen
     
 	LoopOnName:
-	
-;	mov ah,0				;NOT WORKING!!!!
-;	mov cx, 79
-;	ClearLine:
-;	delete 8,ah
-;	inc ah
-;	loop ClearLine
-	
 	PrintText 8,8,AskPlayerName
 	
 	;Receive player name from the user
@@ -579,7 +589,8 @@ DrawInterface	Proc
 	PrintText 1 , 60 , Disp_Hits
 	PrintText 1 , 70 , Disp_lifes	
 	PrintText 1 , 24 , GameTitle
-
+	PrintText 0, 70, EasyMode
+	
 	pop dx
 	pop cx
 	pop ax
@@ -600,4 +611,23 @@ DrawInterface	ENDP
     ret
  Gameover ENDP   
  
+Difficulty Proc
+	
+	cmp Hits, 5
+	jle EasyGame					
+	cmp Hits, 10
+	jle HardGame
+	Delay 0,10000
+	PrintText 0, 67, ExtremeMode ;Extreme Mode when 10<Hits
+	jmp EndDifficulty
+	
+	HardGame: Delay 0,20000		;Hard Mode when 10<=Hits<5
+	PrintText 0, 70, HardMode
+	jmp EndDifficulty
+	
+	EasyGame: Delay 1,0			;Easy Mode when Hits<=5
+	EndDifficulty:
+	ret
+Difficulty ENDP
+
 END MAIN    
