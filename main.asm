@@ -5,6 +5,15 @@
 ;;                  Created by: Michael Malak                        	       ;;
 ;;=============================================================================;;
 
+ConvertDecimal MACRO  decimal, printableDecimal
+	mov al,decimal
+	xor ah, ah 
+	mov cl, 10 
+	div cl 
+	add ax, 3030h
+	mov printableDecimal,ax
+	
+ENDM ConvertDecimal  
 Print MACRO row, column, color 
    push ax
    push bx
@@ -95,23 +104,6 @@ PrintText Macro row , column , text
    pop ax
 ENDM PrintText
 
-ClearScreen MACRO
-        
-    mov ax, 0600h  ;al=0 => Clear
-    mov bh, 07     ;bh=07 => Normal Attributes              
-    mov cx, 0      ;From (cl=column, ch=row)
-    mov dl, 80     ;To dl=column
-    mov dh, 25     ;To dh=row
-    int 10h    
-    
-    ;Move cursor to the beginning of the screen 
-    mov ax, 0
-    mov ah, 2
-    mov dx, 0
-    int 10h   
-    
-ENDM ClearScreen
-
 Delete Macro row, column
    mov Ah, 02h
    mov Bh, 0h
@@ -144,14 +136,23 @@ Delay  Macro Seconds, MilliSeconds
     pop ax
 ENDM Delay 
 
-ConvertDecimal MACRO  decimal, printableDecimal
-	mov al,decimal
-	xor ah, ah 
-	mov cl, 10 
-	div cl 
-	add ax, 3030h
-	mov printableDecimal,ax
-ENDM ConvertDecimal  
+
+ClearScreen MACRO
+        
+    mov ax, 0600h  ;al=0 => Clear
+    mov bh, 07     ;bh=07 => Normal Attributes              
+    mov cx, 0      ;From (cl=column, ch=row)
+    mov dl, 80     ;To dl=column
+    mov dh, 25     ;To dh=row
+    int 10h    
+    
+    ;Move cursor to the beginning of the screen 
+    mov ax, 0
+    mov ah, 2
+    mov dx, 0
+    int 10h   
+    
+ENDM ClearScreen
 ;=========================================
 .MODEL SMALL
 .STACK 64    
@@ -607,7 +608,19 @@ StartMenu Proc
 	pop ax 
 	RET
 StartMenu ENDP
+;==================================================
+ Gameover Proc 
+ ClearScreen
 
+ PrintText 1, 30, PlayerName
+ PrintText 3, 25,FinalScoreString
+ PrintText 5, 5 ,GameoverScreen
+
+ 
+    mov ah,4CH
+    int 21H 
+    ret
+ Gameover ENDP 
 ;==================================================
 DrawInterface	Proc
 	
@@ -647,18 +660,5 @@ DrawInterface	Proc
 	RET
 DrawInterface	ENDP
 
-;==================================================
- Gameover Proc 
- ClearScreen
-
- PrintText 1, 30, PlayerName
- PrintText 3, 25,FinalScoreString
- PrintText 5, 5 ,GameoverScreen
-
- 
-    mov ah,4CH
-    int 21H 
-    ret
- Gameover ENDP 
 ;==================================================
 END MAIN    
