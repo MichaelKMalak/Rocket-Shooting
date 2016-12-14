@@ -480,7 +480,9 @@ RandomiseRocketRow Proc
    ;Change the color of rocket
    NotBlack:
    add RocketColor ,10h				;Add one to background color
-   cmp RocketColor ,00h
+   mov ah, RocketColor
+   and ah, 10h
+   cmp ah ,00h
    jz NotBlack
         
    pop dx
@@ -541,7 +543,6 @@ ResetShot Proc
      mov ShotStatus,al 
 	ret
 ResetShot ENDP 
-
 ;==================================================
 StartMenu Proc
     
