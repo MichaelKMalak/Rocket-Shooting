@@ -433,6 +433,25 @@ CheckShotStatus  Proc
 CheckShotStatus ENDP 
 
 ;==================================================
+Difficulty Proc
+	
+	cmp Hits, 5
+	jle EasyGame					
+	cmp Hits, 10
+	jle HardGame
+	Delay 0,10000
+	PrintText 0, 67, ExtremeMode ;Extreme Mode when 10<Hits
+	jmp EndDifficulty
+	
+	HardGame: Delay 0,20000		;Hard Mode when 10<=Hits<5
+	PrintText 0, 70, HardMode
+	jmp EndDifficulty
+	
+	EasyGame: Delay 1,0			;Easy Mode when Hits<=5
+	EndDifficulty:
+	ret
+Difficulty ENDP
+;==================================================
 DeleteRocket Proc
 	 Delete RocketRow, RocketColLeft
 	 Delete RocketRow, RocketColCenter
@@ -641,26 +660,5 @@ DrawInterface	ENDP
     int 21H 
     ret
  Gameover ENDP 
- 
-               
-;==================================================
-Difficulty Proc
-	
-	cmp Hits, 5
-	jle EasyGame					
-	cmp Hits, 10
-	jle HardGame
-	Delay 0,10000
-	PrintText 0, 67, ExtremeMode ;Extreme Mode when 10<Hits
-	jmp EndDifficulty
-	
-	HardGame: Delay 0,20000		;Hard Mode when 10<=Hits<5
-	PrintText 0, 70, HardMode
-	jmp EndDifficulty
-	
-	EasyGame: Delay 1,0			;Easy Mode when Hits<=5
-	EndDifficulty:
-	ret
-Difficulty ENDP
 ;==================================================
 END MAIN    
