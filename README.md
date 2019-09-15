@@ -1,5 +1,6 @@
 # Rocket Shooting
-The player attempts to shoot moving rockets. The game displays the how-to-play instructions.
+[![GitHub license](https://img.shields.io/github/license/MichaelKMalak/Rocket-Shooting.svg)](https://github.com/MichaelKMalak/Rocket-Shooting/blob/master/LICENSE)
+<br>The player attempts to shoot moving rockets. The game displays the how-to-play instructions.
 
 The game is written in x86 assembly language and tested on Dos box and emu8086.
 
